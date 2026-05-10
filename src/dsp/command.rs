@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 
 use futuresdr::prelude::*;
 
+use super::silence;
+
 /// Commands sent from the UI thread to the DSP thread.
 #[allow(dead_code)]
 pub enum DspCommand {
@@ -60,5 +62,10 @@ pub(super) async fn apply_command(
             return;
         }
     };
-    let _ = handle.post(src, port, pmt).await;
+    // Hold a stderr-silence guard for the duration of the post — the source
+    // block's freq / sample_rate / gain handlers call into libSoapySDR which
+    // emits noisy `[INFO]` lines that would otherwise corrupt ratatui.
+    let fut = handle.post(src, port, pmt);
+    let _guard = silence::SilencedStderr::new();
+    let _ = fut.await;
 }

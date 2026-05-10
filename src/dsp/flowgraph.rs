@@ -32,6 +32,7 @@ use futuresdr::seify::{Device, GenericDevice};
 use crate::app::FFT_SIZE;
 
 use super::command::{Atoms, DspCommand, apply_command};
+use super::silence;
 use super::{MODE_AM, MODE_NBFM, MODE_WBFM, sink, tee};
 
 const DEFAULT_GAIN: f64 = 40.0;
@@ -239,7 +240,8 @@ pub(super) fn run(
 
     // Start the flowgraph and pump commands.
     let rt = Runtime::new();
-    let running = rt.start(fg)?;
+    // Source::init activates the SDR stream which is noisy on stderr.
+    let running = silence::silenced(|| rt.start(fg))?;
     let handle = running.handle();
 
     // Pump commands on a dedicated blocking thread. Using `recv_timeout`

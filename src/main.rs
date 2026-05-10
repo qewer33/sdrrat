@@ -81,6 +81,12 @@ fn main() -> io::Result<()> {
         // SAFETY: single-threaded at this point (before any thread spawn).
         unsafe { std::env::set_var("FUTURESDR_LOG", "off") };
     }
+    // SoapySDR's [INFO] / [DEBUG] prints are routed through the `log` crate
+    // by seify::configure_logging; silence them too. (Raw libSoapySDR /
+    // libusb prints from C still bypass this — see option B for fd redirect.)
+    if std::env::var_os("RUST_LOG").is_none() {
+        unsafe { std::env::set_var("RUST_LOG", "off") };
+    }
 
     let test_mode = std::env::args().any(|a| a == "--test");
     let mut supervisor = Supervisor::new(test_mode);

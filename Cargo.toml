@@ -12,3 +12,4 @@ rand = "0.9"
 futuresdr = { version = "0.0.40", features = ["seify", "soapy", "audio"] }
 confy = "0.6"
 serde = { version = "1", features = ["derive"] }
+libc = "0.2"

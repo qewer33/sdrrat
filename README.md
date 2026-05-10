@@ -3,7 +3,7 @@
 **sdrrat** is a TUI application that interfaces with your SDR hardware and allows you to view the RF spectrum and demodulate signals from your terminal. It's built with Rust, Ratatui and FutureSDR.
 
 > [!WARNING]
-> sdrrat is cyurrently **not stable**, please open an issue for any bugs or crashes you encounter
+> sdrrat is currently **not stable**, please open an issue for any bugs or crashes you encounter
 
 ![screenshot](./assets/screenshot.png)
 
@@ -12,7 +12,7 @@
 - **RTL-SDR** and **HackRF** support
 - **FFT spectrum** graph
 - **Waterfall spectrogram** graph
-- Source **sample rate** and **gain** control.
+- Source **sample rate** and **gain** control
 - **WBFM, NBFM**  and **AM** demodulation
 - Basic **squelch**
 - **Intuitive and easy to use** terminal user interface (TUI)
@@ -33,7 +33,7 @@ You can request any missing features by opening an issue!
 | `m` | Focus the **Min/Max** dB-range stepper |
 | `s` | Open the **Source** popup (device, sample rate, gain) |
 | `r` | Open the **Radio** popup (demod mode, squelch) |
-| `h` | Open the in-app **Help** popup (this list, abridged) |
+| `h` | Open the in-app **Help** popup |
 
 ### VFO mode (after `f`)
 

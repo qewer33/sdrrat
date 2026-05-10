@@ -2,6 +2,7 @@ mod command;
 mod device_kind;
 mod flowgraph;
 mod mock;
+mod silence;
 mod sink;
 mod tee;
 
@@ -25,7 +26,7 @@ pub const MODE_AM: u8 = 3;
 /// the noisy SoapySDR / librtlsdr "[INFO] Opening..." prints land on the
 /// normal terminal rather than corrupting the TUI buffer.
 pub fn open_device(kind: DeviceKind) -> std::result::Result<Device<GenericDevice>, String> {
-    Device::from_args(kind.open_args())
+    silence::silenced(|| Device::from_args(kind.open_args()))
         .map_err(|e| format!("Failed to open {}: {e}", kind.label()))
 }
 

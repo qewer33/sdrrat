@@ -2382,6 +2382,7 @@ dependencies = [
  "crossbeam-channel",
  "crossterm",
  "futuresdr",
+ "libc",
  "num-complex",
  "rand",
  "ratatui",
