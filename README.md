@@ -20,7 +20,7 @@ sdrrat has most of the basic features you can expect from an SDR receiver though
 
 Watch the showcase video below!
 
-![video](./assets/showcase_video.mp4)
+https://github.com/user-attachments/assets/874f4fe0-34fa-4c63-ad54-e0a77fab1622
 
 ## Key Bindings
 
