@@ -1,13 +1,14 @@
 ![banner](./assets/sdrrat_banner.png)
 
-**sdrrat** is a TUI application that interfaces with your SDR hardware and allows you to view the RF spectrum and demodulate signals from your terminal. It's built with Rust, Ratatui and FutureSDR.
+**sdrrat** is a general purpose SDR (Software Defined Radio) receiver TUI (Terminal User Interface) application that interfaces with your SDR hardware and allows you to view the RF spectrum and demodulate signals from your terminal. It's built with Rust, [Ratatui](https://ratatui.rs) and [FutureSDR](https://www.futuresdr.org/).
 
 > [!WARNING]
 > sdrrat is currently **not stable**, please open an issue for any bugs or crashes you encounter
 
 ![screenshot](./assets/screenshot.png)
-
 ## Features
+
+sdrrat has most of the basic features you can expect from an SDR receiver though it's lacking most advanced features. You can request any missing features by opening an issue.
 
 - **RTL-SDR** and **HackRF** support
 - **FFT spectrum** graph
@@ -17,7 +18,9 @@
 - Basic **squelch**
 - **Intuitive and easy to use** terminal user interface (TUI)
 
-You can request any missing features by opening an issue!
+Watch the showcase video below!
+
+![video](./assets/showcase_video.mp4)
 
 ## Key Bindings
 
@@ -26,6 +29,7 @@ You can request any missing features by opening an issue!
 | Key | Action |
 |-----|--------|
 | `q` | Quit (config saves on exit) |
+| `Space` | Start / Stop the data stream |
 | `←` / `→` | Nudge frequency by ±0.1 MHz |
 | `o` | Toggle the spectrum overlay (bandwidth shading + center line) |
 | `d` | Mute / unmute audio (toggles between Off and the last active mode) |
