@@ -101,13 +101,9 @@ impl App {
                     return None;
                 }
                 self.sample_rate_idx = new_idx;
-                // Sample rate is baked into the flowgraph's decimation factors,
-                // so changing it requires a rebuild — disconnect to force the
-                // user to Connect with the new rate.
-                if self.is_connected() {
-                    self.request_disconnect();
-                    self.source_focus = SourceField::Connect;
-                }
+                // Sample rate is baked into the flowgraph's decim factors, so
+                // a rebuild is needed. We DON'T auto-disconnect — let the user
+                // press Apply when ready (the Connect button label changes).
                 None
             }
             SourceField::GainMode => {

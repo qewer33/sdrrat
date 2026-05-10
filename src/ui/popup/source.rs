@@ -19,8 +19,12 @@ fn fmt_sample_rate(rate: u32) -> String {
 
 /// Build the bottom action row: `▸ [Connect] ` (or `[Reconnect]` when
 /// already connected). Highlighted when focused.
-fn connect_row(focused: bool, connected: bool) -> Line<'static> {
-    let label = if connected { "[ Reconnect ]" } else { "[ Connect ]" };
+fn connect_row(focused: bool, connected: bool, stale: bool) -> Line<'static> {
+    let label = match (connected, stale) {
+        (false, _) => "[ Connect ]",
+        (true, true) => "[ Apply ]",
+        (true, false) => "[ Reconnect ]",
+    };
     let style = if focused {
         Style::default()
             .fg(theme::ACCENT)
@@ -94,6 +98,7 @@ pub(in crate::ui) fn draw_popup(frame: &mut Frame, app: &App) {
     lines.push(connect_row(
         app.source_focus == SourceField::Connect,
         app.is_connected(),
+        app.config_stale(),
     ));
 
     let body = Paragraph::new(lines).alignment(Alignment::Left);

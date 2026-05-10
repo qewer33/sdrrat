@@ -26,7 +26,23 @@ impl App {
             KeyCode::Up => self.vfo_increment(),
             KeyCode::Down => self.vfo_decrement(),
             KeyCode::Char('z') => self.vfo_zero_right(),
+            KeyCode::Char(c) if c.is_ascii_digit() => self.vfo_set_digit(c),
             _ => {}
+        }
+    }
+
+    /// Replace the digit at the current cursor position with `c` ('0'..='9'),
+    /// then advance the cursor one place to the right (toward the units).
+    /// At the units digit the cursor stays put.
+    pub fn vfo_set_digit(&mut self, c: char) {
+        let new_digit = (c as u8 - b'0') as i64;
+        let step = self.vfo_step() as i64;
+        let curr_digit = ((self.center_freq as i64) / step) % 10;
+        let delta = (new_digit - curr_digit) * step;
+        let new_freq = ((self.center_freq as i64) + delta).max(0) as u64;
+        self.set_center_freq_clamped(new_freq);
+        if self.vfo_cursor > 0 {
+            self.vfo_cursor -= 1;
         }
     }
 

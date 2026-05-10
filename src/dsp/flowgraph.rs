@@ -55,23 +55,29 @@ pub(super) fn run(
     let mut fg = Flowgraph::new();
 
     // Pick decimation factors so each chain's intermediate rate is close to
-    // its target. With smaller-than-target sample rates `decim` falls back
-    // to 1 (chains run at the input rate; not ideal for WBFM but functional).
+    // its target. We clamp to ≥ 3 because `FirBuilder::decimating`'s default
+    // Kaiser taps require `cutoff (1/decim) + transition_bw (0.1) < 0.5`,
+    // i.e. decim ≥ 3. Sample rates below ~512 kHz yield a too-narrow WBFM
+    // intermediate rate (degraded quality) but won't panic.
     let wbfm_decim = ((sample_rate as f64) / (WBFM_TARGET_RATE as f64))
         .round()
-        .max(1.0) as usize;
+        .max(3.0) as usize;
     let wbfm_rate = sample_rate / wbfm_decim as u32;
     let nb_decim = ((sample_rate as f64) / (NB_TARGET_RATE as f64))
         .round()
-        .max(1.0) as usize;
+        .max(3.0) as usize;
     let nb_rate = sample_rate / nb_decim as u32;
 
-    // Source built from the pre-opened device — no I/O happens here.
-    let src = SeifyBuilder::from_device(dev)
-        .frequency(initial_freq as f64)
-        .sample_rate(sample_rate as f64)
-        .gain(DEFAULT_GAIN)
-        .build_source()?;
+    // Source built from the pre-opened device. `build_source` calls
+    // `set_sample_rate` / `set_frequency` / `set_gain` on the SDR which all
+    // emit `Exact sample rate is: …` and similar lines on stderr.
+    let src = silence::silenced(|| {
+        SeifyBuilder::from_device(dev)
+            .frequency(initial_freq as f64)
+            .sample_rate(sample_rate as f64)
+            .gain(DEFAULT_GAIN)
+            .build_source()
+    })?;
 
     let atoms = Atoms::new();
 
@@ -246,27 +252,38 @@ pub(super) fn run(
 
     // Pump commands on a dedicated blocking thread. Using `recv_timeout`
     // wakes the instant a command lands (no polling latency) and still
-    // checks the quit flag periodically.
+    // checks the quit flag periodically. We *keep* the JoinHandle so we can
+    // wait for the pump to drain before tearing down the runtime — otherwise
+    // an in-flight `handle.post().await` could deadlock during shutdown.
     let cmd_quit = Arc::clone(&quit);
     let atoms_pump = atoms.clone();
-    std::thread::spawn(move || {
+    let pump_handle = handle.clone();
+    let pump_thread = std::thread::spawn(move || {
         use futuresdr::futures::executor::block_on;
         loop {
             if cmd_quit.load(Ordering::Relaxed) {
                 break;
             }
             match cmd_rx.recv_timeout(Duration::from_millis(50)) {
-                Ok(cmd) => block_on(apply_command(&handle, src_id, &atoms_pump, cmd)),
+                Ok(cmd) => block_on(apply_command(&pump_handle, src_id, &atoms_pump, cmd)),
                 Err(crossbeam_channel::RecvTimeoutError::Timeout) => continue,
                 Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
             }
         }
     });
 
-    // Block this thread until quit is signaled, then drop runtime to stop the flowgraph.
+    // Block this thread until quit is signaled.
     while !quit.load(Ordering::Relaxed) {
         std::thread::sleep(Duration::from_millis(50));
     }
+
+    // Graceful shutdown — order matters:
+    //   1. Wait for the pump thread so any in-flight commands finish.
+    //   2. Tell the flowgraph to stop and wait for blocks' deinit() (this is
+    //      what releases the SDR streamer + cpal audio threads).
+    //   3. Drop the runtime.
+    let _ = pump_thread.join();
+    let _ = futuresdr::futures::executor::block_on(running.stop_and_wait());
     drop(rt);
     Ok(())
 }

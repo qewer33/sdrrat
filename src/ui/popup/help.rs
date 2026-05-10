@@ -47,6 +47,7 @@ pub(in crate::ui) fn draw_popup(frame: &mut Frame, _app: &App) {
         Line::default(),
         section(" Global"),
         row("q", "Quit"),
+        row("Space", "Start / Stop stream"),
         row("←/→", "Freq ±0.1 MHz"),
         row("o", "Toggle overlay"),
         row("d", "Mute / unmute"),

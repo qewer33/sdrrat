@@ -12,9 +12,12 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let key_style = Style::default().fg(theme::HEADER_FG).bg(theme::HEADER_BG);
     let desc_style = Style::default().fg(theme::HEADER_FG).bg(Color::Black);
     let mute_label = if app.audio_active() { " Mute  " } else { " Unmute " };
+    let stream_label = if app.is_connected() { " Stop  " } else { " Start  " };
     let bar = Line::from(vec![
         Span::styled(" ←→ ", key_style),
         Span::styled(" ±0.1MHz  ", desc_style),
+        Span::styled(" Space ", key_style),
+        Span::styled(stream_label, desc_style),
         Span::styled(" o ", key_style),
         Span::styled(" Overlay  ", desc_style),
         Span::styled(" d ", key_style),

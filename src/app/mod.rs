@@ -50,6 +50,10 @@ pub struct App {
 
     /// Whether the DSP thread is currently running.
     pub connection: ConnectionState,
+    /// Sample rate the running DSP thread was started with. Compared against
+    /// `current_sample_rate()` to detect when the active flowgraph is stale
+    /// and needs a restart.
+    pub active_sample_rate: Option<u32>,
     /// Set when the user presses Connect in the Source popup.
     /// Main loop consumes it via [`App::take_connect_request`].
     connect_requested: bool,
@@ -104,6 +108,7 @@ impl App {
             rx: None,
             cmd_tx: None,
             connection: ConnectionState::Disconnected { last_error: None },
+            active_sample_rate: None,
             connect_requested: false,
             disconnect_requested: false,
             show_overlay: true,
@@ -152,6 +157,7 @@ impl App {
         self.rx = Some(rx);
         self.cmd_tx = Some(cmd_tx);
         self.connection = ConnectionState::Connected;
+        self.active_sample_rate = Some(self.current_sample_rate());
         // Push current state to the new DSP thread.
         self.send_freq();
         self.send_cmd(DspCommand::SetRadioMode(self.radio_mode.code()));
@@ -162,8 +168,19 @@ impl App {
         self.rx = None;
         self.cmd_tx = None;
         self.connection = ConnectionState::Disconnected { last_error: error };
-        self.spectrum = vec![0.0; FFT_SIZE];
-        self.waterfall.clear();
+        self.active_sample_rate = None;
+        // Spectrum and waterfall are intentionally NOT cleared — they stay
+        // frozen on the last received frame so the user keeps visual context
+        // while the stream is stopped.
+    }
+
+    /// True when the running flowgraph's params no longer match the App's
+    /// current selections (e.g. user changed sample rate after Connect).
+    pub fn config_stale(&self) -> bool {
+        match self.active_sample_rate {
+            Some(active) => active != self.current_sample_rate(),
+            None => false,
+        }
     }
 
     /// User asked to (re)connect via the Source popup. Polled by the main loop.
@@ -262,6 +279,14 @@ impl App {
             }
             KeyCode::Char('h') => {
                 self.mode = AppMode::Help;
+            }
+            KeyCode::Char(' ') => {
+                // Toggle streaming: if connected, stop; otherwise start.
+                if self.is_connected() {
+                    self.request_disconnect();
+                } else {
+                    self.request_connect();
+                }
             }
             KeyCode::Right => {
                 let new_freq = self.center_freq.saturating_add(100_000);
