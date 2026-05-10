@@ -1,0 +1,14 @@
+[package]
+name = "sdrtui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+crossbeam-channel = "0.5"
+num-complex = "0.4"
+rand = "0.9"
+futuresdr = { version = "0.0.40", features = ["seify", "soapy", "audio"] }
+confy = "0.6"
+serde = { version = "1", features = ["derive"] }
