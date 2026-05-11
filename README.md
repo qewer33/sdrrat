@@ -1,4 +1,4 @@
-![banner](./assets/sdrrat_banner_bgremoved.png)
+![banner](./assets/sdrrat_banner.png)
 
 **sdrrat** is a general purpose SDR (Software Defined Radio) receiver TUI (Terminal User Interface) application that interfaces with your SDR hardware and allows you to view the RF spectrum and demodulate signals from your terminal. It's built with Rust, [Ratatui](https://ratatui.rs) and [FutureSDR](https://www.futuresdr.org/).
 
@@ -7,8 +7,6 @@
 
 ![screenshot](./assets/screenshot.png)
 ## Features
-
-sdrrat has most of the basic features you can expect from an SDR receiver though it's lacking most advanced features. You can request any missing features by opening an issue.
 
 - **RTL-SDR** and **HackRF** support
 - **FFT spectrum** graph
@@ -21,6 +19,8 @@ sdrrat has most of the basic features you can expect from an SDR receiver though
 Watch the showcase video below!
 
 https://github.com/user-attachments/assets/874f4fe0-34fa-4c63-ad54-e0a77fab1622
+
+sdrrat has most of the basic features you can expect from an SDR receiver, though it's lacking most advanced features. You can request any missing features by opening an issue.
 
 ## Key Bindings
 
@@ -47,7 +47,7 @@ https://github.com/user-attachments/assets/874f4fe0-34fa-4c63-ad54-e0a77fab1622
 | `↑` / `↓` | Increment / decrement the focused digit (±10ⁿ) |
 | `z` | Zero out all digits to the right of the cursor |
 | `Enter` | Commit and exit |
-| `Esc` | Cancel — restore the frequency from when the popup opened |
+| `Esc` | Cancel, restore the frequency from when the popup opened |
 
 ### Min/Max mode (after `m`)
 
@@ -56,7 +56,7 @@ https://github.com/user-attachments/assets/874f4fe0-34fa-4c63-ad54-e0a77fab1622
 | `Tab` | Switch focus between Min and Max |
 | `↑` / `↓` | Adjust focused value by ±5 dB |
 | `Enter` | Commit and exit |
-| `Esc` | Cancel — restore prior bounds |
+| `Esc` | Cancel, restore prior bounds |
 
 ### Popups
 
@@ -94,8 +94,8 @@ sdrrat runs as two threads bridged by lock-free channels:
 
 ### Threads & channels
 
-- **UI thread** (main thread) — owns the App state, runs the ratatui draw loop, handles crossterm key events. Reads FFT magnitude frames from a bounded `crossbeam_channel` and pushes user commands onto another. Never blocks on I/O.
-- **DSP thread** — hosts a single FutureSDR `Runtime` that runs the flowgraph (see below). A small command-pump task drains the UI command channel and forwards changes to the source block's message ports (frequency, sample rate, gain) or shared atomics (squelch, audio mode).
+- **UI thread** (main thread), owns the App state, runs the ratatui draw loop, handles crossterm key events. Reads FFT magnitude frames from a bounded `crossbeam_channel` and pushes user commands onto another. Never blocks on I/O.
+- **DSP thread**, hosts a single FutureSDR `Runtime` that runs the flowgraph (see below). A small command-pump task drains the UI command channel and forwards changes to the source block's message ports (frequency, sample rate, gain) or shared atomics (squelch, audio mode).
 - **`Supervisor`** in `main.rs` owns the DSP thread's lifecycle. Connect / reconnect tears the thread down with a per-thread quit flag, joins it (so the device is fully released), then spawns a fresh one with new channel ends.
 
 ### FutureSDR flowgraph
@@ -133,7 +133,7 @@ src/
 │   ├── radio.rs       Radio popup state + mode helpers
 │   └── persist.rs     TOML config load/save (via confy)
 ├── dsp/
-│   ├── mod.rs         public API (open_device, spawn, MODE_* constants)
+│   ├── mod.rs         public API
 │   ├── device_kind.rs DeviceKind enum (RTL-SDR, HackRF) + per-device args/range
 │   ├── command.rs     DspCommand + shared Atoms + apply_command pump
 │   ├── flowgraph.rs   the full FutureSDR flowgraph builder
@@ -141,14 +141,14 @@ src/
 │   ├── sink.rs        ChunkSink: batches f32 samples into FFT-sized frames
 │   └── mock.rs        --test mode stub
 └── ui/
-    ├── mod.rs         top-level draw + disconnected placeholder
+    ├── mod.rs         top-level draw
     ├── theme.rs       colour constants
-    ├── util.rs        downsample (DC-centered) + centered_rect_abs
-    ├── spectrum.rs    chart + overlay + frequency ruler
-    ├── waterfall.rs   half-block waterfall widget
+    ├── util.rs        ui utils
+    ├── spectrum.rs    FFT spectrum graph widget
+    ├── waterfall.rs   waterfall graph wşdget
     ├── status_bar.rs  bottom controls strip
     ├── header/        VFO + dB range row
-    └── popup/         shared popup chrome + Source / Radio popups
+    └── popup/         shared popup widget + Source/Radio/Help popups
 ```
 
 ### Persistence
