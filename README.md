@@ -1,4 +1,4 @@
-![banner](./assets/sdrrat_banner.png)
+![banner](./assets/sdrrat_banner_bgremoved.png)
 
 **sdrrat** is a general purpose SDR (Software Defined Radio) receiver TUI (Terminal User Interface) application that interfaces with your SDR hardware and allows you to view the RF spectrum and demodulate signals from your terminal. It's built with Rust, [Ratatui](https://ratatui.rs) and [FutureSDR](https://www.futuresdr.org/).
 
