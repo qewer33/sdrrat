@@ -69,91 +69,57 @@ sdrrat has most of the basic features you can expect from an SDR receiver, thoug
 
 ## Architecture
 
-sdrrat runs as two threads bridged by lock-free channels:
+There are two threads doing work. The UI thread runs the ratatui draw loop and reads keypresses. The DSP thread owns the SDR hardware and runs all the signal processing. They talk through a couple of `crossbeam_channel`s: one carries FFT magnitude frames toward the UI, the other carries user commands (tune to this frequency, change sample rate, set squelch, etc.) toward the DSP. Neither side ever blocks on the other.
 
-```
-                ┌──────────────────────────────────┐
-                │           UI thread              │
-                │  ratatui draw + crossterm input  │
-                └──────┬───────────────────┬───────┘
-                       │                   │
-                       │                   ▼
-                       │            DspCommand channel
-                       │       (TuneFrequency, SetMode, …)
-                       │                   │
-                       ▲                   ▼
-                spectrum frames     ┌─────────────────────┐
-                Vec<f32>            │   DSP thread        │
-                       │            │   FutureSDR runtime │
-                       └────────────┴─────────────────────┘
-                                          │
-                                          ▼
-                                   SDR hardware
-                                  (via SoapySDR)
-```
+The DSP thread itself is mostly a thin shell around a [FutureSDR](https://futuresdr.org/) flowgraph. FutureSDR handles the scheduling of all the actual blocks (the SDR source, the FFT, the FIR filters and resamplers, the audio sink) and we wire it together once at startup. A small command-pump task inside the runtime drains the command channel and forwards changes either to the source block's message ports (frequency, sample rate, gain, which it knows how to pass through to SoapySDR) or to a handful of shared atomics that the DSP blocks read every sample (squelch threshold, current demod mode, audio volume).
 
-### Threads & channels
+A `Supervisor` struct in `main.rs` owns the DSP thread's lifecycle. When you press Space to stop, or change the device or sample rate and press Apply, the supervisor sets a per-thread quit flag, joins the DSP thread, and calls FutureSDR's `stop_and_wait` so every block gets to run its `deinit()` cleanly. The SDR streamer deactivates, the cpal audio stream releases, no orphaned threads. Then on the next Start the supervisor spawns a new thread with fresh channels.
 
-- **UI thread** (main thread), owns the App state, runs the ratatui draw loop, handles crossterm key events. Reads FFT magnitude frames from a bounded `crossbeam_channel` and pushes user commands onto another. Never blocks on I/O.
-- **DSP thread**, hosts a single FutureSDR `Runtime` that runs the flowgraph (see below). A small command-pump task drains the UI command channel and forwards changes to the source block's message ports (frequency, sample rate, gain) or shared atomics (squelch, audio mode).
-- **`Supervisor`** in `main.rs` owns the DSP thread's lifecycle. Connect / reconnect tears the thread down with a per-thread quit flag, joins it (so the device is fully released), then spawns a fresh one with new channel ends.
+### The flowgraph
 
-### FutureSDR flowgraph
+The source is a `seify::Source` configured with a SoapySDR driver string for whichever device is selected. It produces I/Q samples that fan out (via a custom `Tee` block, since FutureSDR's stream buffers are single-reader) to two parallel paths.
 
-```
-seify::Source ──▶ Tee₁ ──▶ FFT ──▶ Magnitude ──▶ ChunkSink ──▶ UI channel
-                    │
-                    ▼
-                  Tee₂ ──▶ WBFM chain (decim 4 → 256 kHz)
-                    │       discriminator → resamp 3/16 → de-emphasis → vol_a
-                    │
-                    ▼      ────────┐
-                  Narrow chain (decim 32 → 32 kHz)            │
-                    power-meter → demod (NBFM/AM dispatch)    ├─▶ Combine ─▶ AudioSink (cpal, 48 kHz)
-                    → resamp 3/2 → vol_b                      │
-                                                              ┘
-```
+The **spectrum path** is the boring one: 1024-point FFT, magnitude in dB, and a custom `ChunkSink` that batches the f32 samples into FFT-sized frames and pushes them through the channel to the UI. That's what you see drawn as the spectrum graph and the waterfall.
 
-- **Spectrum path** runs an `Fft` (1024-bin, FFT-shifted) followed by a magnitude conversion (10·log₁₀ of `|c|²`) and a custom `ChunkSink` that batches f32 samples into FFT-sized frames pushed via a `crossbeam_channel` to the UI.
-- **WBFM chain** decimates IQ to 256 kHz, runs a quadrature discriminator (FM ±75 kHz deviation), resamples to 48 kHz audio, applies 75 µs de-emphasis, then a volume gate.
-- **Narrow chain** decimates harder (to 32 kHz) for NBFM and AM. A single `Apply` block dispatches to the right discriminator at runtime based on a shared `AtomicU8` mode flag (so mode changes don't require flowgraph restart). The narrow-bandwidth IQ stream also feeds a power meter that drives the squelch.
-- **Mixer** (`Combine`) sums the two volume gates into the audio sink. Only one chain is non-zero at a time (the inactive volume gate outputs 0).
-- **`Tee` and `ChunkSink`** are custom blocks since FutureSDR's stream buffers are single-reader. Both live in `dsp/`.
+The **demod path** branches again into two sub-chains:
+
+- The **wideband FM chain** decimates the I/Q stream to about 256 kHz, runs a quadrature discriminator tuned for +/- 75 kHz deviation, resamples down to 48 kHz audio, applies a 75 us de-emphasis filter, and ends in a volume gate.
+- The **narrow chain** decimates harder, down to about 32 kHz, and shares a single `Apply` block that dispatches to either an FM discriminator (for NBFM) or an envelope detector with DC blocking (for AM), depending on the current mode atomic. Because the dispatch is a runtime check on an `AtomicU8`, switching between NBFM and AM doesn't require rebuilding the flowgraph. The same narrow IQ stream feeds a power meter that updates the signal-power atomic the squelch reads.
+
+Both demod sub-chains end in their own volume gate, and a `Combine` block sums them into the cpal audio sink. At any moment at most one chain has a non-zero volume, so the sum is just whatever's active.
+
+The exact decimation factors aren't hardcoded. They're computed from whatever sample rate the device is running at, targeting about 256 kHz for WBFM and 32 kHz for narrow modes. That's why changing the sample rate in the Source popup forces a flowgraph rebuild: the FIR filters are designed at build time.
 
 ### Module layout
 
 ```
 src/
 ├── main.rs            entry point + DSP supervisor
-├── app/
+├── app/               UI-side state and key handlers
 │   ├── mod.rs         App struct, AppMode, channel I/O, key dispatch
 │   ├── vfo.rs         frequency tuning helpers + VFO key handler
 │   ├── db_range.rs    Y-axis stepper
 │   ├── source.rs      Source popup state + sample-rate / gain options
 │   ├── radio.rs       Radio popup state + mode helpers
 │   └── persist.rs     TOML config load/save (via confy)
-├── dsp/
+├── dsp/               DSP thread + flowgraph
 │   ├── mod.rs         public API
 │   ├── device_kind.rs DeviceKind enum (RTL-SDR, HackRF) + per-device args/range
-│   ├── command.rs     DspCommand + shared Atoms + apply_command pump
+│   ├── command.rs     DspCommand + shared atomics + the command pump
 │   ├── flowgraph.rs   the full FutureSDR flowgraph builder
 │   ├── tee.rs         1-in 2-out fanout block
 │   ├── sink.rs        ChunkSink: batches f32 samples into FFT-sized frames
-│   └── mock.rs        --test mode stub
-└── ui/
+│   └── silence.rs     RAII guard that redirects stderr around noisy native calls
+└── ui/                ratatui drawing
     ├── mod.rs         top-level draw
     ├── theme.rs       colour constants
-    ├── util.rs        ui utils
+    ├── util.rs        downsample + small layout helpers
     ├── spectrum.rs    FFT spectrum graph widget
-    ├── waterfall.rs   waterfall graph wşdget
+    ├── waterfall.rs   waterfall graph widget
     ├── status_bar.rs  bottom controls strip
-    ├── header/        VFO + dB range row
-    └── popup/         shared popup widget + Source/Radio/Help popups
+    ├── header/        top row (connection status, VFO, dB range)
+    └── popup/         Source / Radio / Help popups + shared chrome
 ```
-
-### Persistence
-
-User config is stored as TOML under the OS config dir (`~/.config/sdrtui/sdrtui.toml` on Linux). Saved fields include the last frequency, dB range, demod mode, squelch, sample rate, gain, and selected device. The file is read once at startup and rewritten once at graceful exit.
 
 ## License
 
