@@ -1,7 +1,19 @@
 [package]
-name = "sdrtui"
+name = "sdrrat"
 version = "0.1.0"
+description = "discover the RF spectrum on your terminal"
+authors = ["qewer <yerdemergul@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/qewer33/sdrrat"
+repository = "https://github.com/qewer33/sdrrat"
+keywords = ["sdr", "radio", "tui", "ratatui", "futuresdr"]
+categories = ["command-line-utilities", "hardware-support", "multimedia::audio"]
 edition = "2024"
+exclude = [
+    "assets/**",
+    ".github/**",
+]
 
 [dependencies]
 ratatui = "0.29"

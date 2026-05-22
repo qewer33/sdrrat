@@ -22,6 +22,26 @@ https://github.com/user-attachments/assets/874f4fe0-34fa-4c63-ad54-e0a77fab1622
 
 sdrrat has most of the basic features you can expect from an SDR receiver, though it's lacking most advanced features. You can request any missing features by opening an issue.
 
+## Installation
+
+Install the published crate with Cargo:
+
+```bash
+cargo install sdrrat
+```
+
+Requirements:
+
+- `libSoapySDR` plus a driver module for your hardware on `PATH`. On Arch that's `soapysdr` together with `soapyrtlsdr` for RTL-SDR or `soapyhackrf` for HackRF. On Debian/Ubuntu the packages are `libsoapysdr0.8` and `soapysdr-module-rtlsdr` / `soapysdr-module-hackrf`.
+- ALSA headers (`libasound2-dev` on Debian/Ubuntu) at build time for the audio sink.
+- The usual `pkg-config`, `cmake`, `libusb-1.0-dev` for the underlying RTL-SDR / HackRF C libraries.
+
+Run `SoapySDRUtil --probe="driver=rtlsdr"` (or `driver=hackrf`) to confirm SoapySDR can see your device before launching sdrrat.
+
+Development requirements:
+
+- Rust toolchain with Cargo (edition 2024).
+
 ## Key Bindings
 
 ### Global
