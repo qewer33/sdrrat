@@ -4,6 +4,32 @@ use crate::dsp::DspCommand;
 
 use super::{App, AppMode};
 
+/// Common VHF/UHF channel steps, stored as Hz.
+const TUNE_STEPS: &[(u64, &str)] = &[
+    (1_000, "1 kHz"),
+    (5_000, "5 kHz"),
+    (6_250, "6.25 kHz"),
+    (10_000, "10 kHz"),
+    (12_500, "12.5 kHz"),
+    (25_000, "25 kHz"),
+    (50_000, "50 kHz"),
+    (100_000, "100 kHz"),
+];
+
+pub const DEFAULT_TUNE_STEP_IDX: usize = 7; // 100 kHz
+
+pub fn tune_step_hz(idx: usize) -> u64 {
+    TUNE_STEPS[idx].0
+}
+
+pub fn tune_step_label(idx: usize) -> &'static str {
+    TUNE_STEPS[idx].1
+}
+
+pub fn tune_step_count() -> usize {
+    TUNE_STEPS.len()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RadioMode {
     Off,
@@ -73,19 +99,25 @@ impl RadioMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RadioField {
     Mode,
+    TuneStep,
     Squelch,
 }
 
 impl RadioField {
     pub fn next(self) -> Self {
         match self {
-            RadioField::Mode => RadioField::Squelch,
+            RadioField::Mode => RadioField::TuneStep,
+            RadioField::TuneStep => RadioField::Squelch,
             RadioField::Squelch => RadioField::Mode,
         }
     }
 
     pub fn prev(self) -> Self {
-        self.next()
+        match self {
+            RadioField::Mode => RadioField::Squelch,
+            RadioField::TuneStep => RadioField::Mode,
+            RadioField::Squelch => RadioField::TuneStep,
+        }
     }
 }
 
@@ -124,6 +156,14 @@ impl App {
                     self.last_radio_mode = next;
                 }
                 self.set_radio_mode(next);
+            }
+            RadioField::TuneStep => {
+                let max = tune_step_count() - 1;
+                if delta > 0 && self.tune_step_idx < max {
+                    self.tune_step_idx += 1;
+                } else if delta < 0 && self.tune_step_idx > 0 {
+                    self.tune_step_idx -= 1;
+                }
             }
             RadioField::Squelch => {
                 let step = SQUELCH_STEP * delta.signum() as f32;

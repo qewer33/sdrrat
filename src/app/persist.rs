@@ -25,6 +25,12 @@ pub struct PersistedConfig {
     pub sample_rate_idx: usize,
     pub agc_enabled: bool,
     pub gain_idx: usize,
+    #[serde(default = "default_tune_step_idx")]
+    pub tune_step_idx: usize,
+}
+
+fn default_tune_step_idx() -> usize {
+    super::radio::DEFAULT_TUNE_STEP_IDX
 }
 
 impl Default for PersistedConfig {
@@ -41,6 +47,7 @@ impl Default for PersistedConfig {
             sample_rate_idx: 1,
             agc_enabled: true,
             gain_idx: DeviceKind::default().default_gain_idx(),
+            tune_step_idx: default_tune_step_idx(),
         }
     }
 }
@@ -65,6 +72,7 @@ pub fn save(app: &App) {
         sample_rate_idx: app.sample_rate_idx,
         agc_enabled: app.agc_enabled,
         gain_idx: app.gain_idx,
+        tune_step_idx: app.tune_step_idx,
     };
     let _ = confy::store(APP_NAME, CONFIG_NAME, &cfg);
 }
@@ -121,6 +129,11 @@ impl App {
             self.gain_idx = cfg.gain_idx;
         } else {
             self.gain_idx = self.device_kind.default_gain_idx();
+        }
+        if cfg.tune_step_idx < super::radio::tune_step_count() {
+            self.tune_step_idx = cfg.tune_step_idx;
+        } else {
+            self.tune_step_idx = super::radio::DEFAULT_TUNE_STEP_IDX;
         }
     }
 }
