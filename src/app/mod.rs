@@ -15,7 +15,7 @@ use crossterm::event::KeyCode;
 use crate::dsp::{DeviceKind, DspCommand};
 
 pub use db_range::MinMaxFocus;
-pub use radio::{RadioField, RadioMode};
+pub use radio::{RadioField, RadioMode, tune_step_hz, tune_step_label};
 pub use source::SourceField;
 
 pub const FFT_SIZE: usize = 1024;
@@ -96,6 +96,8 @@ pub struct App {
     pub last_radio_mode: RadioMode,
     /// Squelch threshold in dB.
     pub squelch_db: f32,
+    /// Index into the tune step table (used by left/right arrows in Normal mode).
+    pub tune_step_idx: usize,
 }
 
 impl App {
@@ -129,6 +131,7 @@ impl App {
             radio_mode: RadioMode::Off,
             last_radio_mode: RadioMode::WBFM,
             squelch_db: -50.0,
+            tune_step_idx: radio::DEFAULT_TUNE_STEP_IDX,
         }
     }
 
@@ -289,11 +292,13 @@ impl App {
                 }
             }
             KeyCode::Right => {
-                let new_freq = self.center_freq.saturating_add(100_000);
+                let step = tune_step_hz(self.tune_step_idx);
+                let new_freq = self.center_freq.saturating_add(step);
                 self.set_center_freq_clamped(new_freq);
             }
             KeyCode::Left => {
-                let new_freq = self.center_freq.saturating_sub(100_000);
+                let step = tune_step_hz(self.tune_step_idx);
+                let new_freq = self.center_freq.saturating_sub(step);
                 self.set_center_freq_clamped(new_freq);
             }
             _ => {}

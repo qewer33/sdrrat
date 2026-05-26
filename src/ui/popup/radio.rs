@@ -4,7 +4,7 @@ use ratatui::style::{Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-use crate::app::{App, RadioField};
+use crate::app::{App, RadioField, tune_step_label};
 
 use super::super::theme;
 use super::{draw_chrome, field_row};
@@ -53,7 +53,7 @@ fn slider_row(label: &str, fraction: f32, db: f32, focused: bool) -> Line<'stati
 }
 
 pub(in crate::ui) fn draw_popup(frame: &mut Frame, app: &App) {
-    let inner = draw_chrome(frame, "Radio", RADIO_POPUP_WIDTH, 6);
+    let inner = draw_chrome(frame, "Radio", RADIO_POPUP_WIDTH, 7);
 
     let mode_value = if app.radio_mode.is_supported() {
         app.radio_mode.label().to_string()
@@ -67,6 +67,13 @@ pub(in crate::ui) fn draw_popup(frame: &mut Frame, app: &App) {
         false,
     );
 
+    let step_row = field_row(
+        "Tune step",
+        tune_step_label(app.tune_step_idx).to_string(),
+        app.radio_focus == RadioField::TuneStep,
+        false,
+    );
+
     let squelch_row = slider_row(
         "Squelch",
         app.squelch_fraction(),
@@ -74,7 +81,7 @@ pub(in crate::ui) fn draw_popup(frame: &mut Frame, app: &App) {
         app.radio_focus == RadioField::Squelch,
     );
 
-    let body = Paragraph::new(vec![Line::default(), mode_row, squelch_row])
+    let body = Paragraph::new(vec![Line::default(), mode_row, step_row, squelch_row])
         .alignment(Alignment::Left);
     frame.render_widget(body, inner);
 }

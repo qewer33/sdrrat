@@ -4,7 +4,7 @@ use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-use crate::app::App;
+use crate::app::{App, tune_step_label};
 
 use super::theme;
 
@@ -15,7 +15,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let stream_label = if app.is_connected() { " Stop  " } else { " Start  " };
     let bar = Line::from(vec![
         Span::styled(" ←→ ", key_style),
-        Span::styled(" ±0.1MHz  ", desc_style),
+        Span::styled(format!(" ±{}  ", tune_step_label(app.tune_step_idx)), desc_style),
         Span::styled(" Space ", key_style),
         Span::styled(stream_label, desc_style),
         Span::styled(" o ", key_style),
